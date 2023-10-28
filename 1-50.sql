@@ -256,17 +256,220 @@ FROM Classes
 WHERE bore >= 16		
 		
 /* 32 */
-		
+/* CAST - преобразование типа данных
+ * power - возведение числа в степень */	
+SELECT t1.country,
+	CAST(avg(power(t1.bore,3)/2) AS NUMERIC(6,2)) AS weight
+FROM (SELECT c.country, c.bore, s.name
+		FROM Classes c
+		LEFT JOIN Ships s ON c.class=s.class
+		UNION 
+		SELECT c.country, c.bore, o.ship name
+		FROM Classes c
+		LEFT JOIN Outcomes o ON c.class=o.ship) t1
+WHERE name IS NOT NULL
+GROUP BY t1.country		
 		
 /* 33 */
-		
+SELECT ship 
+FROM Outcomes
+WHERE battle = 'North Atlantic' AND result = 'sunk'		
 		
 /* 34 */
+SELECT name 
+FROM ships s, classes c
+WHERE c.class = s.class AND displacement > 35000 
+	AND launched >= 1922 AND type = 'bb'
+
 /* 35 */
+/* LIKE - поиск содержащих символов
+ * '%[^A-Z]%'  - не содержит только латинских букв
+ * '%[^0-9]%'  - не содержит только цифры 
+ * ^ - диапозон 
+ * [] - одиночный символ (указывается)*/
+SELECT model, type 
+FROM Product
+WHERE upper(model) NOT LIKE '%[^A-Z]%' 
+		OR model NOT LIKE '%[^0-9]%'
+
 /* 36 */
+SELECT s.name 
+FROM Ships s
+WHERE s.name = s.class
+UNION 
+SELECT o.ship AS name 
+FROM Outcomes o
+JOIN Classes c ON c.class = o.ship		
+
 /* 37 */
+SELECT c.class 
+FROM Classes c
+LEFT JOIN (SELECT class, name 
+			FROM Ships
+			UNION
+			SELECT Classes.class AS class, Outcomes.ship AS name
+			FROM Outcomes
+			JOIN Classes ON Outcomes.ship = Classes.class) AS s ON c.class = s.class
+GROUP BY c.class
+HAVING count(s.name)=1
+
 /* 38 */
+/* INTERSECT - пересечение (встречаются и одновременно в разных запросах) */
+SELECT country
+FROM Classes
+where type = 'bb' 
+INTERSECT 
+SELECT country
+FROM Classes
+where type = 'bc'
+
 /* 39 */
+SELECT DISTINCT o.ship
+FROM Outcomes o, Battles b
+WHERE o.battle = b.name AND o.ship IN (SELECT o1.ship
+										FROM Outcomes o1, Battles b1
+										WHERE o1.battle = b1.name AND o1.result = 'damaged' 
+												AND b.date > b1.date)
+
 /* 40 */
+SELECT maker, max(type) AS type
+FROM product 
+GROUP BY maker
+HAVING count(DISTINCT type) = 1 AND count(model) > 1
+
 /* 41 */
+/* case/ when / then / end - проверка значения на пустоту(условие на вывод) */
+SELECT t1.maker, CASE WHEN count(price) = count(*) THEN max(price) END AS m_price
+FROM (SELECT Product.maker, CASE WHEN count(price) = count(*) THEN max(price) END AS price
+		FROM Product
+		JOIN PC ON PC.model = Product.model
+		GROUP BY Product.maker
+		UNION 
+		SELECT Product.maker, CASE WHEN count(price) = count(*) THEN max(price) END AS price
+		FROM Product
+		JOIN Printer ON Printer.model = Product.model
+		GROUP BY Product.maker
+		UNION 
+		SELECT Product.maker,CASE WHEN count(price) = count(*) THEN max(price) END AS price
+		FROM Product
+		JOIN Laptop ON Laptop.model = Product.model
+		GROUP BY Product.maker
+		) as t1
+GROUP BY t1.maker
+
 /* 42 */
+SELECT Outcomes.ship, Outcomes.battle
+FROM Outcomes
+WHERE Outcomes.result = 'sunk'
+
+/* 43 */
+/* IS NOT NULL - проверка значения на пустоту (в данном случае, что не содержит) */
+SELECT Battles.name
+FROM Battles
+WHERE YEAR(Battles.date) NOT IN (SELECT DISTINCT Ships.launched 
+									FROM Ships
+									WHERE Ships.launched IS NOT NULL)
+
+/* 44 */
+SELECT Ships.name
+FROM Ships
+WHERE Ships.name LIKE 'R%'
+UNION
+SELECT Outcomes.ship
+FROM Outcomes
+WHERE Outcomes.ship LIKE 'R%'
+
+/* 45 */
+SELECT Ships.name
+FROM Ships
+WHERE Ships.name LIKE '% % %'
+UNION
+SELECT Outcomes.ship
+FROM Outcomes
+WHERE Outcomes.ship LIKE '% % %'
+
+/* 46 */
+/* ---Моя первая попытка------ */
+SELECT Outcomes.ship, Classes.displacement, Classes. numGuns
+FROM Outcomes
+JOIN Ships ON Outcomes.ship = Ships.name
+JOIN Classes ON Ships.class = Classes.class
+WHERE Outcomes. battle = 'Guadalcanal'
+/* ----Моя вторая попытка с учтением всех кораблей----- */
+SELECT o.ship, displacement, numGuns 
+FROM (SELECT name AS ship, displacement, numGuns
+		FROM Ships s 
+		JOIN Classes c ON c.class=s.class
+		UNION
+		SELECT class AS ship, displacement, numGuns
+		FROM Classes c
+		) AS a
+RIGHT JOIN Outcomes o ON o.ship=a.ship
+WHERE battle = 'Guadalcanal'
+
+/* 47 */
+/* ---Получения количества кораблей по странам----- */
+WITH T1 AS (SELECT COUNT(name) as co, country 
+			FROM (SELECT name, country 
+					FROM Classes 
+					INNER JOIN Ships ON Ships.class = Classes.class
+					UNION 
+					SELECT ship, country 
+					FROM Classes 
+					INNER JOIN Outcomes ON Outcomes.ship = Classes.class
+					) FR1
+			GROUP BY country
+			),
+
+/* ---Получения количества кораблей по странам, которые были потоплены----- */
+T2 AS (SELECT COUNT(name) as co, country 
+		FROM (SELECT name, country 
+				FROM Classes 
+				INNER JOIN Ships ON Ships.class = Classes.class
+				WHERE name IN (SELECT DISTINCT ship 
+								FROM Outcomes 
+								WHERE result = 'sunk'
+								)
+				UNION
+				SELECT ship, country 
+				FROM Classes 
+				INNER JOIN Outcomes ON Outcomes.ship = Classes.class
+				WHERE ship IN (SELECT DISTINCT ship 
+								FROM Outcomes 
+								WHERE result = 'sunk')
+								) FR2 
+				GROUP BY country 
+				)
+
+/* ---Сверка двух временных таблиц----- */
+SELECT T1.country 
+FROM T1
+INNER JOIN T2 ON T1.co = t2.co and t1.country = t2.country
+
+/* 48 */
+SELECT Classes.class
+FROM Classes
+JOIN Outcomes ON Outcomes.ship = Classes.class
+WHERE Outcomes.result = 'sunk'
+UNION
+SELECT Ships.class
+FROM Ships
+JOIN Outcomes ON Outcomes.ship = Ships.name
+WHERE Outcomes.result = 'sunk'
+
+/* 49 */
+SELECT Ships.name
+FROM Ships
+JOIN Classes ON Classes.class = Ships.class
+WHERE Classes.bore = 16
+UNION 
+SELECT Outcomes.ship
+FROM Outcomes
+JOIN Classes ON Classes.class = Outcomes.ship
+WHERE Classes.bore = 16
+
+/* 50 */
+SELECT DISTINCT Outcomes.battle
+FROM Outcomes
+JOIN Ships ON Outcomes.ship = Ships.name
+WHERE Ships.class = 'Kongo'
