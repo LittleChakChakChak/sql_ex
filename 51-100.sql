@@ -53,15 +53,36 @@ FROM (SELECT s.name, c.numGuns
 		WHERE c.type = 'bb' AND o.ship = c.class) t
 
 /* 55 */
-SELECT c.class, s.launched as year
+SELECT c.class, s.launched AS year
 FROM Classes c
-left join (SELECT class, min(launched) AS launched
+LEFT JOIN (SELECT class, min(launched) AS launched
 			FROM Ships
-			GROUP BY class) s on s.class = c.class
-		
+			GROUP BY class) s ON s.class = c.class
 		
 /* 56 */
+SELECT c.class, count(os.result) as sunks
+FROM Classes c
+LEFT JOIN (SELECT *
+			FROM Outcomes o 
+			LEFT JOIN Ships s ON s.name = o.ship
+			WHERE result = 'sunk') os ON os.class = c.class OR os.ship = c.class
+GROUP BY c.class
+
 /* 57 */
+SELECT c.class, 
+FROM Class c
+LEFT JOIN (SELECT s.class
+			FROM Ships s
+			LEFT JOIN Outcomes o ON s.name = o.ship
+			GROUP BY s.class
+			HAVING count(s.name) > 3) t ON t.class = c.class
+WHERE o.result = 'sunk' OR s.class IS NULL
+GROUP BY s.class
+
+
+
+
+
 /* 58 */
 /* 59 */
 /* 60 */
